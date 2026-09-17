@@ -1,0 +1,33 @@
+# Secrets and tokens
+.env
+.tokens.json
+.tokens.json.tmp
+.tio.tokens.json
+tokens.db
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+release/
+*.spec
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyright/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+*.mdc
+
+# Local blocklist edits may contain private IDs; keep the example only
+# blocklist.json is tracked as the default empty file
