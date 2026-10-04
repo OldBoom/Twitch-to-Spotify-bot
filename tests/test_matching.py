@@ -1,6 +1,13 @@
 """Search re-ranking: Spotify's top hit is not always the right track."""
 
-from matching import MIN_SCORE, artist_title_query, best_match, score, transliterate
+from matching import (
+    MIN_SCORE,
+    artist_title_query,
+    best_match,
+    rank,
+    score,
+    transliterate,
+)
 from spotify.client import Track
 
 
@@ -74,6 +81,65 @@ def test_extra_words_still_clear_the_threshold() -> None:
 
 def test_duplicate_candidates_are_ignored() -> None:
     assert best_match("король и шут", [WANTED, WANTED]) is WANTED
+
+
+def test_glued_artist_name_matches_separate_words() -> None:
+    """Chat types "demon dice"; Spotify stores the artist as "DEMONDICE"."""
+    wanted = track("Alkatraz", ("DEMONDICE",), id="alkatraz")
+    assert score("demon dice alkatraz", wanted) == 1.0
+    assert best_match("demon dice alkatraz", [wanted]) is wanted
+
+
+def test_short_query_word_does_not_substring_match() -> None:
+    """Guard the substring rule against generic words latching onto anything."""
+    unrelated = track("Enter Sandman", ("Metallica",), id="sandman")
+    assert score("en", unrelated) == 0.0
+
+
+def test_padded_title_loses_to_the_plain_one() -> None:
+    """Both cover "birdbrain teto", but one is a translated re-recording."""
+    original = track("Birdbrain", ("Kasane Teto",), id="original")
+    translated = track("BIRDBRAIN en Español Teto SV2", ("Zein Hiwaroshi",), id="es")
+    query = "birdbrain teto"
+
+    assert score(query, translated) == score(query, original) == 1.0
+    assert rank(query, translated) < rank(query, original)
+    chosen = best_match(query, [translated, original])
+    assert chosen is not None
+    assert chosen.id == "original"
+
+
+def test_live_version_loses_to_the_studio_one() -> None:
+    studio = track("Dancing Queen", ("ABBA",), id="studio")
+    live = track("Dancing Queen - Live at Wembley Arena", ("ABBA",), id="live")
+    chosen = best_match("dancing queen", [live, studio])
+    assert chosen is not None
+    assert chosen.id == "studio"
+
+
+def test_live_version_wins_when_explicitly_requested() -> None:
+    studio = track("Dancing Queen", ("ABBA",), id="studio")
+    live = track("Dancing Queen - Live at Wembley Arena", ("ABBA",), id="live")
+    chosen = best_match("dancing queen live", [studio, live])
+    assert chosen is not None
+    assert chosen.id == "live"
+
+
+def test_remix_and_cover_markers_are_demoted() -> None:
+    plain = track("Smells Like Teen Spirit", ("Nirvana",), id="plain")
+    for marker in ("Remix", "Instrumental", "Karaoke", "Sped Up"):
+        variant = track(
+            f"Smells Like Teen Spirit - {marker}", ("Nirvana",), id=marker.lower()
+        )
+        chosen = best_match("smells like teen spirit", [variant, plain])
+        assert chosen is not None, marker
+        assert chosen.id == "plain", marker
+
+
+def test_penalties_never_reject_a_lone_candidate() -> None:
+    """Ranking must only reorder; a live-only result is still better than none."""
+    live = track("Dancing Queen - Live at Wembley Arena", ("ABBA",), id="live")
+    assert best_match("dancing queen", [live]) is live
 
 
 def test_artist_title_query_builds_field_filters() -> None:

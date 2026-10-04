@@ -200,15 +200,33 @@ spammed against the Spotify API.
 ## Search accuracy
 
 Name searches fetch 10 candidates and re-rank them locally instead of trusting Spotify's top
-hit, which drifts to tribute albums and covers on loose queries. A candidate is scored on how
-many of the request's words it accounts for, across both title and artist:
+hit, which drifts to tribute albums and covers on loose queries. Ranking happens in two
+steps, which are deliberately separate: **admission** decides whether a candidate accounts
+for enough of the request, and **ordering** decides which admitted candidate is the better
+recording. Penalties apply only to ordering, so a stricter preference can never turn a
+findable song into `No track found`.
+
+Admission scores how many of the request's words a candidate accounts for, across both title
+and artist:
 
 - Typos are tolerated (`дурак и морния` still finds `Дурак и молния`).
 - Cyrillic requests are transliterated, so `король и шут` matches the romanized `Korol i Shut`.
-- Equal scores keep Spotify's own order, which favours the original over covers.
+- Words glued together on Spotify's side still match when chat types them apart, so
+  `demon dice alkatraz` finds `Alkatraz — DEMONDICE`.
 - `artist - title` and `title by artist` also run a field-filtered search.
 - If nothing accounts for at least half the request, the reply is `No track found` rather
   than a wrong track.
+
+Ordering then prefers the leanest, least re-recorded candidate:
+
+- Title words the request did not ask for cost a little, so `Birdbrain` beats
+  `BIRDBRAIN en Español Teto SV2`. Artist words are exempt, because charging for them would
+  favour covers by short-named artists over the original.
+- Re-recording markers (`live`, `remix`, `cover`, `karaoke`, `instrumental`, `acoustic`,
+  `sped`, `slowed`, `nightcore`, and similar) are demoted, which is why a live cut no longer
+  wins over the studio version. Asking for one explicitly (`!sr dancing queen live`) cancels
+  the penalty, since the marker is then part of the request.
+- Remaining ties keep Spotify's own order, which favours the original over covers.
 
 Spotify links and URIs bypass search entirely and are always exact.
 
